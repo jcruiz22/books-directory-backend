@@ -1,7 +1,8 @@
-import express, { Application } from "express";
+import express, { Application, NextFunction, Request, Response } from "express";
 import { connectDB } from "./config/db";
 import dotenv from "dotenv";
 import bookRoutes from "./routes/bookRoutes";
+import errorHandler from "./middleware/errorHandler";
 
 dotenv.config();
 
@@ -17,11 +18,13 @@ connectDB();
 // Routes
 app.use("/api/books", bookRoutes);
 
-
-// Root route for testing
-app.get("/", (req, res) => {
-  res.send("📚 Books Directory API is running...");
+// 404 handler (if no route matched)
+app.use((req: Request, res: Response, next: NextFunction) => {
+  res.status(404).json({ status: 404, message: "Not Found" });
 });
+
+// Global error handler (must come last)
+app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);

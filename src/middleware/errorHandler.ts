@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from "express";
+import mongoose from "mongoose";
 
 interface ErrorWithStatus extends Error {
   status?: number;
@@ -9,27 +10,35 @@ interface ErrorWithStatus extends Error {
 }
 
 const errorHandler = (
-  err: ErrorWithStatus,
+  err: any,
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
-  // Log the error for debugging
-  console.error(err);
-  // Determine status code and message
-  const statusCode = err.status || err.statusCode || 500;
-  const message = err.message || "Internal Server Error";
+  console.error("🔥 Error caught:", err.message);
 
-  // Handle Mongoose validation errorsif
-  if (err.name === "CastError") {
+  // ✅ Handle Mongoose validation errors
+  if (err instanceof mongoose.Error.ValidationError) {
     return res.status(400).json({
-      message: `Invalid ${err.path}: ${err.value}.`,
+      status: 400,
+      message: "Validation Error",
+      details: Object.values(err.errors).map((e: any) => e.message),
     });
   }
-  return res.status(statusCode).json({
-    status: statusCode,
-    message,
-    // Include stack trace only when not in production
-    ...(process.env.NODE_ENV !== "production" && { stack: err.stack }),
+
+  // ✅ Handle other Mongoose bad ObjectId errors
+  if (err instanceof mongoose.Error.CastError) {
+    return res.status(400).json({
+      status: 400,
+      message: `Invalid ${err.path}: ${err.value}`,
+    });
+  }
+
+  // ✅ Generic fallback
+  res.status(err.status || 500).json({
+    status: err.status || 500,
+    message: err.message || "Internal Server Error",
   });
 };
+
+export default errorHandler;
