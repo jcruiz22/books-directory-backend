@@ -81,6 +81,7 @@ export const deleteBook = async (
 };
 
 // Search books by title or author (optional enhancement)
+// Note: The searchBooks function allows searching by title, author, or genre using a query parameter.
 export const searchBooks = async (
   req: Request,
   res: Response,
@@ -103,5 +104,26 @@ export const searchBooks = async (
     res.status(200).json(books);
   } catch (err) {
     next(err);
+  }
+};
+
+// Filter books by genre, author, year (optional enhancement)
+export const filterBooks = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { author, genre, year } = req.query;
+    const filter: any = {};
+
+    if (author) filter.author = { $regex: new RegExp(author as string, 'i') };
+    if (genre) filter.genre = genre;
+    if (year) filter.publishedYear = Number(year);
+
+    const books = await Book.find(filter);
+    res.status(200).json(books);
+  } catch (err) {
+    next(err as any);
   }
 };
