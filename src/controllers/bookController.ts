@@ -122,9 +122,12 @@ export const filterBooks = async (
   next: NextFunction
 ) => {
   try {
-    const { author, genre, year, page = "1", limit="10", sort } = req.query;
+    const { author, genre, year, page = "1", limit = "10", sort } = req.query;
     if (!author && !genre && !year) {
-      return res.status(400).json({ message: "❌ At least one filter parameter (author, genre, year) is required" });
+      return res.status(400).json({
+        message:
+          "❌ At least one filter parameter (author, genre, year) is required",
+      });
     }
 
     const filter: any = {};
@@ -134,24 +137,65 @@ export const filterBooks = async (
     if (year) filter.publishedYear = Number(year);
 
     // Pagination
-    const pageNum = Number(page );
+    const pageNum = Number(page);
     const limitNum = Number(limit);
     const skip = (pageNum - 1) * limitNum;
 
     // Sorting
     let sortOption: any = {};
     if (sort) {
-        const direction = (sort as string).startsWith("-") ? -1 : 1;
-        const field = (sort as string).replace("-", "");
-        sortOption= { [field]: direction };
+      const direction = (sort as string).startsWith("-") ? -1 : 1;
+      const field = (sort as string).replace("-", "");
+      sortOption = { [field]: direction };
     }
 
     // Query with pagination and sorting
-    const books = await Book.find(filter).sort(sortOption).skip(skip).limit(limitNum);
+    const books = await Book.find(filter)
+      .sort(sortOption)
+      .skip(skip)
+      .limit(limitNum);
     const total = await Book.countDocuments(filter);
 
-    res.status(200).json({ page:pageNum, limit:limitNum, total, totalPages: Math.ceil(total/limitNum), results: books });
+    res.status(200).json({
+      page: pageNum,
+      limit: limitNum,
+      total,
+      totalPages: Math.ceil(total / limitNum),
+      results: books,
+    });
   } catch (err) {
     next(err as any);
   }
+};
+
+// Sidebar option - get distinct genres, authors and years
+export const getSideBarOptions = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+) => {
+    try {
+        const [authors, genres, years] = await Promise.all([
+            Book.aggregate([
+                { $group: { _id: "$author", count: { $sum: 1 } } },
+                { $sort: { _id: 1 } },
+            ]),
+            Book.aggregate([
+                { $group: { _id: "$genre", count: { $sum: 1 } } },
+                { $sort: { _id: 1 } },
+            ]),
+            Book.aggregate([
+                { $group: { _id: "$publishedYear", count: { $sum: 1 } } },
+                { $sort: { _id: -1 } },
+            ])
+        ]);
+
+        res.status(200).json({
+            authors: authors.map((a) => ({ name: a._id, count: a.count })),
+            genres: genres.map((g) => ({ name: g._id, count: g.count })),
+            years: years.map((y) => ({ name: y._id, count: y.count })),
+        });
+    } catch (err) {
+        next(err as any);
+    }
 };
