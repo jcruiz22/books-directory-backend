@@ -37,9 +37,18 @@ export const createBook = async (
   next: NextFunction
 ) => {
   try {
-    const newBook = new Book(req.body);
+const bookData = req.body; // Expecting a single book object   
+// Check if bookData is an array (for multiple books) or a single object
+if (Array.isArray(bookData)) {
+    // If it's an array, use insertMany to add multiple books
+    const newBooks = await Book.insertMany(bookData);
+    res.status(201).json(newBooks);
+}else {
+    // If it's a single object, create and save one book
+    const newBook = new Book(bookData);
     await newBook.save();
     res.status(201).json(newBook);
+}
   } catch (err) {
     next(err as any);
   }
