@@ -37,18 +37,18 @@ export const createBook = async (
   next: NextFunction
 ) => {
   try {
-const bookData = req.body; // Expecting a single book object   
-// Check if bookData is an array (for multiple books) or a single object
-if (Array.isArray(bookData)) {
-    // If it's an array, use insertMany to add multiple books
-    const newBooks = await Book.insertMany(bookData);
-    res.status(201).json(newBooks);
-}else {
-    // If it's a single object, create and save one book
-    const newBook = new Book(bookData);
-    await newBook.save();
-    res.status(201).json(newBook);
-}
+    const bookData = req.body; // Expecting a single book object
+    // Check if bookData is an array (for multiple books) or a single object
+    if (Array.isArray(bookData)) {
+      // If it's an array, use insertMany to add multiple books
+      const newBooks = await Book.insertMany(bookData);
+      res.status(201).json(newBooks);
+    } else {
+      // If it's a single object, create and save one book
+      const newBook = new Book(bookData);
+      await newBook.save();
+      res.status(201).json(newBook);
+    }
   } catch (err) {
     next(err as any);
   }
@@ -89,8 +89,7 @@ export const deleteBook = async (
   }
 };
 
-// Search books by title or author (optional enhancement)
-// Note: The searchBooks function allows searching by title, author, or genre using a query parameter.
+// Search books by title or author
 export const searchBooks = async (
   req: Request,
   res: Response,
@@ -116,22 +115,42 @@ export const searchBooks = async (
   }
 };
 
-// Filter books by genre, author, year (optional enhancement)
+// Filter books by genre, author, year
 export const filterBooks = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    const { author, genre, year } = req.query;
+    const { author, genre, year, page = "1", limit="10", sort } = req.query;
+    if (!author && !genre && !year) {
+      return res.status(400).json({ message: "❌ At least one filter parameter (author, genre, year) is required" });
+    }
+
     const filter: any = {};
 
-    if (author) filter.author = { $regex: new RegExp(author as string, 'i') };
+    if (author) filter.author = { $regex: new RegExp(author as string, "i") };
     if (genre) filter.genre = genre;
     if (year) filter.publishedYear = Number(year);
 
-    const books = await Book.find(filter);
-    res.status(200).json(books);
+    // Pagination
+    const pageNum = Number(page );
+    const limitNum = Number(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Sorting
+    let sortOption: any = {};
+    if (sort) {
+        const direction = (sort as string).startsWith("-") ? -1 : 1;
+        const field = (sort as string).replace("-", "");
+        sortOption= { [field]: direction };
+    }
+
+    // Query with pagination and sorting
+    const books = await Book.find(filter).sort(sortOption).skip(skip).limit(limitNum);
+    const total = await Book.countDocuments(filter);
+
+    res.status(200).json({ page:pageNum, limit:limitNum, total, totalPages: Math.ceil(total/limitNum), results: books });
   } catch (err) {
     next(err as any);
   }
